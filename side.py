@@ -133,7 +133,7 @@ def main():
         st.stop()
     
     # Header
-    st.markdown('<h1 class="main-header">🍺 Bar Specials Dashboard 🍺</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">🍺 PSU BAR DEALS 🍺</h1>', unsafe_allow_html=True)
     
     # Sidebar
     st.sidebar.markdown('<div class="sidebar-content">', unsafe_allow_html=True)
