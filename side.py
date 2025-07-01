@@ -95,12 +95,11 @@ def load_data():
     ]
     
     current_dir = os.getcwd()
-    st.sidebar.info(f"Looking for CSV file in: {current_dir}")
+    
     
     # List all CSV files in the directory
     csv_files = [f for f in os.listdir(current_dir) if f.endswith('.csv')]
-    if csv_files:
-        st.sidebar.info(f"CSV files found: {', '.join(csv_files)}")
+
     
     df = pd.DataFrame()
     
@@ -108,7 +107,7 @@ def load_data():
         try:
             if os.path.exists(filename):
                 df = pd.read_csv(filename)
-                st.sidebar.success(f"✅ Loaded data from: {filename}")
+                
                 break
         except Exception as e:
             st.sidebar.error(f"Error loading {filename}: {str(e)}")
