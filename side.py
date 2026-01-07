@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+import pytz
 import plotly.express as px
 import plotly.graph_objects as go
 
@@ -238,11 +239,9 @@ def display_by_day(df, selected_day):
                     st.markdown(f"""
                     <div class="bar-card">
                         <div class="bar-name">🍻 {row['Bar']}</div>
-                        <div class="deal-text">{row['Deal']}</div>
+                        <div>💰 {row['Deal']}</div>
                     </div>
                     """, unsafe_allow_html=True)
-            
-            st.markdown("---")
 
 def display_by_bar(df, selected_bar):
     """Display specials organized by bar"""
@@ -252,131 +251,104 @@ def display_by_bar(df, selected_bar):
         bars_to_show = [selected_bar]
     
     for bar in bars_to_show:
-        bar_data = df[df['Bar'] == bar].sort_values('Day')
+        bar_data = df[df['Bar'] == bar]
         
         if not bar_data.empty:
-            st.markdown(f'<h2 class="day-header">🏪 {bar}</h2>', unsafe_allow_html=True)
+            st.markdown(f"### 🍺 {bar}")
             
-            # Create a more compact layout for bar view
+            # Display specials for each day
             for _, row in bar_data.iterrows():
                 col1, col2 = st.columns([1, 3])
-                
                 with col1:
                     st.markdown(f"**{row['Day']}**")
-                
                 with col2:
-                    st.markdown(f"🍺 {row['Deal']}")
+                    st.markdown(f"{row['Deal']}")
             
             st.markdown("---")
 
 def display_summary_stats(df):
     """Display summary statistics and visualizations"""
-    st.markdown('<h2 class="day-header">📊 Summary Statistics</h2>', unsafe_allow_html=True)
+    st.markdown("## 📊 Dashboard Statistics")
     
     # Key metrics
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         st.metric("Total Bars", df['Bar'].nunique())
-    
     with col2:
         st.metric("Total Specials", len(df))
-    
     with col3:
-        st.metric("Days Covered", df['Day'].nunique())
-    
+        avg_specials = len(df) / 7
+        st.metric("Avg Specials/Day", f"{avg_specials:.1f}")
     with col4:
-        avg_specials = len(df) / df['Bar'].nunique()
-        st.metric("Avg Specials/Bar", f"{avg_specials:.1f}")
-    
-    st.markdown("---")
+        most_active = df.groupby('Bar').size().idxmax()
+        st.metric("Most Active Bar", most_active)
     
     # Visualizations
+    st.markdown("### 📈 Specials Distribution")
+    
     col1, col2 = st.columns(2)
     
     with col1:
-        # Bar chart of specials by day
+        # Specials by day
         day_counts = df.groupby('Day').size().reset_index(name='Count')
-        fig1 = px.bar(
-            day_counts, 
-            x='Day', 
-            y='Count',
-            title='Number of Specials by Day',
-            color='Count',
-            color_continuous_scale='viridis'
-        )
-        fig1.update_layout(showlegend=False)
+        fig1 = px.bar(day_counts, x='Day', y='Count', 
+                     title='Number of Specials by Day',
+                     color='Count',
+                     color_continuous_scale='Blues')
         st.plotly_chart(fig1, use_container_width=True)
     
     with col2:
-        # Bar chart of specials by bar
+        # Specials by bar
         bar_counts = df.groupby('Bar').size().reset_index(name='Count')
-        fig2 = px.bar(
-            bar_counts, 
-            x='Bar', 
-            y='Count',
-            title='Number of Specials by Bar',
-            color='Count',
-            color_continuous_scale='plasma'
-        )
-        fig2.update_layout(showlegend=False, xaxis_tickangle=-45)
+        bar_counts = bar_counts.sort_values('Count', ascending=False).head(10)
+        fig2 = px.bar(bar_counts, x='Bar', y='Count',
+                     title='Top 10 Bars by Number of Specials',
+                     color='Count',
+                     color_continuous_scale='Reds')
+        fig2.update_xaxis(tickangle=-45)
         st.plotly_chart(fig2, use_container_width=True)
     
-    # Detailed breakdown table
-    st.markdown("### 📋 Detailed Breakdown")
+    # Day coverage by bar
+    st.markdown("### 📅 Day Coverage by Bar")
+    coverage = df.groupby('Bar')['Day'].apply(list).reset_index()
+    coverage['Days'] = coverage['Day'].apply(lambda x: ', '.join(sorted(set(x), key=['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].index)))
+    coverage['Day Count'] = coverage['Day'].apply(lambda x: len(set(x)))
+    coverage = coverage.sort_values('Day Count', ascending=False)
     
-    # Create a pivot table showing which bars have specials on which days
-    pivot_table = df.pivot_table(
-        index='Bar', 
-        columns='Day', 
-        values='Deal', 
-        aggfunc='first',
-        fill_value=''
-    )
-    
-    # Style the dataframe
-    def highlight_cells(val):
-        return 'background-color: lightgreen' if val != '' else ''
-    
-    styled_table = pivot_table.style.applymap(highlight_cells)
-    st.dataframe(styled_table, use_container_width=True)
-    
-    # Raw data table
-    with st.expander("🔍 View Raw Data"):
-        st.dataframe(df, use_container_width=True)
+    st.dataframe(coverage[['Bar', 'Day Count', 'Days']], use_container_width=True)
 
 def display_night_out_planner(df, selected_day):
-    """Display the night out planner with bar rankings and route optimization"""
-    st.markdown('<h2 class="day-header">🗺️ Night Out Planner</h2>', unsafe_allow_html=True)
+    """Interactive night out planner"""
+    st.markdown("## 🎉 Plan Your Night Out")
+    st.markdown(f"### Planning for: **{selected_day}**")
     
     # Get bars for the selected day
-    day_bars = df[df['Day'] == selected_day]['Bar'].unique()
+    day_data = df[df['Day'] == selected_day]
     
-    if len(day_bars) == 0:
-        st.warning(f"No bars have specials on {selected_day}")
+    if day_data.empty:
+        st.warning(f"No specials found for {selected_day}")
         return
     
-    st.markdown("### 🎯 Step 1: Rank Your Favorite Bars")
-    st.info("Rate each bar from 1-10 based on your preferences. Higher ratings = more likely to be included in your route!")
+    day_bars = day_data['Bar'].tolist()
     
-    # Create bar rankings
+    # Step 1: Rank the bars
+    st.markdown("### ⭐ Step 1: Rate Your Interest")
+    st.markdown("Rate each bar from 1 (not interested) to 10 (must visit)")
+    
     bar_rankings = {}
     
-    # Create columns for better layout
+    # Create a more compact layout for rankings
     cols = st.columns(2)
-    
     for idx, bar in enumerate(sorted(day_bars)):
         col = cols[idx % 2]
+        
         with col:
-            # Get the deal for this bar on this day
-            deal = df[(df['Day'] == selected_day) & (df['Bar'] == bar)]['Deal'].iloc[0]
-            
-            st.markdown(f"**🍻 {bar}**")
+            deal = day_data[day_data['Bar'] == bar]['Deal'].iloc[0]
+            st.markdown(f"**{bar}**")
             st.caption(f"Special: {deal}")
-            
-            # Rating slider
             rating = st.slider(
-                f"Rating for {bar}",
+                "Interest level:",
                 min_value=1,
                 max_value=10,
                 value=5,
@@ -614,4 +586,6 @@ def generate_route_tips(route, style, budget_focus):
 
 if __name__ == "__main__":
     main()
+
+
 
