@@ -147,8 +147,11 @@ def load_data():
     return df.sort_values(['Day', 'Bar'])
 
 def get_current_day():
-    """Get current day of the week"""
-    return datetime.now().strftime('%A')
+    """Get current day of the week in Eastern Time"""
+    # Use Eastern timezone (adjust to your timezone if different)
+    eastern = pytz.timezone('America/New_York')
+    now_eastern = datetime.now(eastern)
+    return now_eastern.strftime('%A')
 
 def main():
     # Load data
@@ -611,3 +614,4 @@ def generate_route_tips(route, style, budget_focus):
 
 if __name__ == "__main__":
     main()
+
